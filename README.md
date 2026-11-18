@@ -1,93 +1,81 @@
-# GitHub Codespaces ♥️ React
+# Carbon Chat
 
-Welcome to your shiny new Codespace running React! We've got everything fired up and running for you to explore React.
+A React 18 + Vite chat workspace with IBM Carbon, the Vercel AI SDK, browser-local
+conversation storage, and Cloudflare Pages Functions. The app does not return
+mock responses. Until an AI provider is configured, sending is disabled and the
+UI explains what is missing.
 
-You've got a blank canvas to work on from a git perspective as well. There's a single initial commit with the what you're seeing right now - where you go from here is up to you!
+## Run locally
 
-Everything you do here is contained within this one codespace. There is no repository on GitHub yet. If and when you’re ready you can click "Publish Branch" and we’ll create your repository and push up your project. If you were just exploring then and have no further need for this code then you can simply delete your codespace and it's gone forever.
+```sh
+npm install
+npm run pages:dev
+```
 
-This project was bootstrapped for you with [Vite](https://vitejs.dev/).
+`pages:dev` builds the Vite app and runs its `dist/` output together with the
+Pages Functions through Wrangler. For local server configuration, create an
+ignored `.dev.vars` file:
 
-## Available Scripts
+```dotenv
+AI_BASE_URL=https://your-openai-compatible-provider.example/v1
+AI_MODEL=your-model-id
+AI_API_KEY=your-provider-key
 
-In the project directory, you can run:
+# Optional web search (Tavily-compatible API)
+SEARCH_PROVIDER=tavily
+SEARCH_API_KEY=your-search-key
+# Optional override for a compatible search endpoint:
+# SEARCH_API_URL=https://your-search-provider.example/search
+```
 
-### `npm start`
+The chat function uses the generic AI SDK OpenAI-compatible adapter. Configure
+a provider that supports the OpenAI Chat Completions-compatible API; no specific
+vendor is selected. Provider credentials remain in the Pages Function runtime.
+Do not use `VITE_` variables for secrets.
 
-We've already run this for you in the `Codespaces: server` terminal window below. If you need to stop the server for any reason you can just run `npm start` again to bring it back online.
+## Cloudflare Pages deployment
 
-Runs the app in the development mode.\
-Open [http://localhost:3000/](http://localhost:3000/) in the built-in Simple Browser (`Cmd/Ctrl + Shift + P > Simple Browser: Show`) to view your running application.
+1. Create a Pages project named `codespaces-react` and connect the repository.
+   Set the build command to `npm run build` and output directory to `dist`.
+2. Set `AI_BASE_URL` and `AI_MODEL` as Pages environment variables. Set
+   `AI_API_KEY` with `npx wrangler pages secret put AI_API_KEY`.
+3. Optionally set `SEARCH_PROVIDER=tavily` and add the `SEARCH_API_KEY` secret.
+   `SEARCH_API_URL` may point at a compatible search endpoint.
+4. Deploy with `npm run pages:deploy` after Wrangler is authenticated. The
+   function routes under `functions/api/` are deployed with Pages.
 
-The page will reload automatically when you make changes.\
-You may also see any lint errors in the console.
+`GET /api/config` returns only whether the server is configured and the
+non-secret model label. `POST /api/chat` streams AI SDK UI message chunks,
+validates inputs, caps the request body at 8 MB, and returns generic provider
+errors. `POST /api/search` returns a clear unavailable response until the
+supported search provider is configured. Same-origin Pages routes are used;
+the functions do not enable permissive cross-origin access.
 
-### `npm test`
+## Implemented workspace features
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+- Carbon-based responsive light/dark/system UI, navigation, conversation
+  search, date grouping, rename/delete, and keyboard shortcuts.
+- AI SDK streaming, stop, regenerate/retry, edit-and-resend, feedback, message
+  copying, local IndexedDB persistence through Dexie, and Zustand settings.
+- Streamdown streaming Markdown with Shiki code highlighting, copy/download
+  controls, math, Mermaid, line numbers, safe HTML handling, and safe-link
+  prompts. Messages use one renderer rather than duplicating Markdown output.
+- Image, PDF, and text/source attachments with size limits, image compression,
+  previews, and a lightbox. Text files are included as text; images/PDFs are
+  sent as model file parts. Provider support for file parts depends on the
+  configured compatible model.
+- Server-side Tavily web search tool when configured, with returned source
+  links; no fabricated search results when search is unavailable.
+- Conversation Markdown/JSON export and JSON import.
 
-### `npm run build`
+Heavy Markdown and image-viewer code is loaded on demand. The other installed
+editor, charting, terminal, diff, and workflow libraries are available for
+follow-on features but are not yet wired into this app.
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## Commands
 
-The build is minified and the filenames include the hashes in `dist/`.
-The app is configured for Cloudflare Pages in `wrangler.jsonc`.
-
-## Cloudflare Pages
-
-- `npm run pages:dev` builds the Vite app and runs it with Wrangler Pages locally.
-- `npm run pages:deploy` builds and deploys `dist/` to the Pages project named
-  `codespaces-react`. Create the Pages project in Cloudflare first if it does not
-  exist.
-- Add server-side endpoints in the root `functions/` directory. Put local
-  function secrets in `.dev.vars` (ignored by Git); use `wrangler pages secret
-  put <NAME>` for production secrets. Never put model keys in `VITE_` variables.
-
-A model provider has not been selected, so no provider SDK or chat API endpoint
-is configured yet. When selected, integrate it in a Pages Function using the AI
-SDK and Cloudflare runtime bindings.
-
-## Chat dependencies
-
-IBM Carbon is the primary UI system; use Radix primitives only for interactions
-without a suitable Carbon component. Streamdown is the streaming chat Markdown
-renderer, with its code, math, and Mermaid plugins. The React Markdown/remark/
-rehype packages are available for separate non-streaming surfaces; do not
-render the same message through both stacks. Dexie is the primary IndexedDB
-store; avoid persisting the same conversation data separately with `idb`.
-
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
-
-## Learn More
-
-You can learn more in the [Vite documentation](https://vitejs.dev/guide/).
-
-To learn Vitest, a Vite-native testing framework, go to [Vitest documentation](https://vitest.dev/guide/)
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://sambitsahoo.com/blog/vite-code-splitting-that-works.html](https://sambitsahoo.com/blog/vite-code-splitting-that-works.html)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://github.com/btd/rollup-plugin-visualizer#rollup-plugin-visualizer](https://github.com/btd/rollup-plugin-visualizer#rollup-plugin-visualizer)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://dev.to/hamdankhan364/simplifying-progressive-web-app-pwa-development-with-vite-a-beginners-guide-38cf](https://dev.to/hamdankhan364/simplifying-progressive-web-app-pwa-development-with-vite-a-beginners-guide-38cf)
-
-### Advanced Configuration
-
-This section has moved here: [https://vitejs.dev/guide/build.html#advanced-base-options](https://vitejs.dev/guide/build.html#advanced-base-options)
-
-### Deployment
-
-This section has moved here: [https://vitejs.dev/guide/build.html](https://vitejs.dev/guide/build.html)
-
-### Troubleshooting
-
-This section has moved here: [https://vitejs.dev/guide/troubleshooting.html](https://vitejs.dev/guide/troubleshooting.html)
+- `npm start` — Vite frontend only (Pages API functions are not served here).
+- `npm run pages:dev` — local Pages app and functions.
+- `npm run build` — production Vite build.
+- `npm test -- --run` — run tests once.
+- `npm run pages:deploy` — build and deploy Pages output.

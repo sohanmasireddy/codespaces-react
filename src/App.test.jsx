@@ -2,8 +2,8 @@ import { expect, test } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import App from './App';
 
-test('renders learn react link', () => {
+test('renders the chat workspace and provider configuration notice', async () => {
   render(<App />);
-  const linkElement = screen.getByText(/learn react/i);
-  expect(linkElement).toBeDefined();
+  expect(await screen.findByText(/What can I help/i)).toBeDefined();
+  expect(screen.getByText(/No demo responses are generated/i)).toBeDefined();
 });
