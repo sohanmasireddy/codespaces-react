@@ -1,7 +1,7 @@
 # Carbon Chat
 
 A React 18 + Vite chat workspace with IBM Carbon, the Vercel AI SDK, browser-local
-conversation storage, and Cloudflare Pages Functions. The app does not return
+conversation storage, and a Cloudflare Worker. The app does not return
 mock responses. Until an AI provider is configured, sending is disabled and the
 UI explains what is missing.
 
@@ -9,12 +9,12 @@ UI explains what is missing.
 
 ```sh
 npm install
-npm run pages:dev
+npm run worker:dev
 ```
 
-`pages:dev` builds the Vite app and runs its `dist/` output together with the
-Pages Functions through Wrangler. For local server configuration, create an
-ignored `.dev.vars` file:
+`worker:dev` builds the Vite app and runs the Worker, API routes, and static
+assets through Wrangler. For local server configuration, create an ignored
+`.dev.vars` file:
 
 ```dotenv
 AI_BASE_URL=https://your-openai-compatible-provider.example/v1
@@ -30,26 +30,29 @@ SEARCH_API_KEY=your-search-key
 
 The chat function uses the generic AI SDK OpenAI-compatible adapter. Configure
 a provider that supports the OpenAI Chat Completions-compatible API; no specific
-vendor is selected. Provider credentials remain in the Pages Function runtime.
+vendor is selected. Provider credentials remain in the Worker runtime.
 Do not use `VITE_` variables for secrets.
 
-## Cloudflare Pages deployment
+## Cloudflare Workers deployment
 
-1. Create a Pages project named `codespaces-react` and connect the repository.
-   Set the build command to `npm run build` and output directory to `dist`.
-2. Set `AI_BASE_URL` and `AI_MODEL` as Pages environment variables. Set
-   `AI_API_KEY` with `npx wrangler pages secret put AI_API_KEY`.
+1. In Workers Builds, connect the repository with root directory `/`, build
+   command `npm run build`, and deploy command `npx wrangler deploy`.
+   `wrangler.jsonc` configures `dist/` as static assets and enables the
+   `workers.dev` URL.
+2. Set `AI_BASE_URL` and `AI_MODEL` as Worker environment variables. Add
+   `AI_API_KEY` as a secret using `npx wrangler secret put AI_API_KEY`.
 3. Optionally set `SEARCH_PROVIDER=tavily` and add the `SEARCH_API_KEY` secret.
    `SEARCH_API_URL` may point at a compatible search endpoint.
-4. Deploy with `npm run pages:deploy` after Wrangler is authenticated. The
-   function routes under `functions/api/` are deployed with Pages.
+4. For a manual deployment after Wrangler authentication, run
+   `npm run deploy`.
 
 `GET /api/config` returns only whether the server is configured and the
 non-secret model label. `POST /api/chat` streams AI SDK UI message chunks,
 validates inputs, caps the request body at 8 MB, and returns generic provider
 errors. `POST /api/search` returns a clear unavailable response until the
-supported search provider is configured. Same-origin Pages routes are used;
-the functions do not enable permissive cross-origin access.
+supported search provider is configured. The Worker serves API endpoints from
+`functions/api/` and static files from `dist/`; it does not enable permissive
+cross-origin access.
 
 ## Implemented workspace features
 
@@ -74,8 +77,8 @@ follow-on features but are not yet wired into this app.
 
 ## Commands
 
-- `npm start` — Vite frontend only (Pages API functions are not served here).
-- `npm run pages:dev` — local Pages app and functions.
+- `npm start` — Vite frontend only (Worker API routes are not served here).
+- `npm run worker:dev` — local Worker, API routes, and static assets.
 - `npm run build` — production Vite build.
 - `npm test -- --run` — run tests once.
-- `npm run pages:deploy` — build and deploy Pages output.
+- `npm run deploy` — build and deploy the Worker and static assets.
