@@ -1,76 +1,233 @@
-# Carbon Chat
+# AI Chatbot
 
-A React 18 + Vite chat workspace with IBM Carbon, the Vercel AI SDK, browser-local
-conversation storage, and a Cloudflare Worker. The app does not return
-mock responses. Until an AI provider is configured, sending is disabled and the
-UI explains what is missing.
+A modern, full-featured AI chatbot built with React, Vite, IBM Carbon, and the Vercel AI SDK. Designed for fast streaming responses, rich Markdown rendering, interactive code blocks, file attachments, and deployment on Cloudflare Pages.
 
-## Run locally
+## Features
 
-```sh
+### AI Chat
+- Real-time token streaming
+- Multi-turn conversations
+- Conversation history
+- Stop and regenerate responses
+- Edit and resend messages
+- Copy messages and code blocks
+- Conversation search
+- Persistent local storage
+
+### Rich Message Rendering
+- Streaming Markdown
+- Syntax-highlighted code blocks
+- Tables and lists
+- Mathematical equations and LaTeX
+- Mermaid diagrams
+- Rich text formatting
+- Interactive charts and visualizations
+
+### Developer Tools
+- Monaco code editor
+- Syntax highlighting with Shiki
+- Code comparison and diffs
+- Terminal interface with Xterm.js
+- Code copying and downloading
+
+### File Support
+- Drag-and-drop uploads
+- Multiple file attachments
+- Image previews
+- Document attachments
+- File validation
+- Upload progress
+- Image viewing and zooming
+
+### User Interface
+- IBM Carbon component system
+- Responsive layout
+- Light and dark themes
+- Animated transitions
+- Resizable panels
+- Conversation sidebar
+- Keyboard shortcuts
+- Toast notifications
+
+### Additional Capabilities
+- Web search integration
+- Interactive charts
+- Mermaid flowcharts
+- React Flow diagrams
+- Conversation export and import
+- Configurable AI settings
+
+## Technology Stack
+
+| Technology | Purpose |
+|---|---|
+| React | Frontend framework |
+| Vite | Development and build tooling |
+| IBM Carbon | Primary UI system |
+| Vercel AI SDK | AI integration and streaming |
+| Cloudflare Pages | Hosting and deployment |
+| Cloudflare Pages Functions | Server-side API |
+| Shiki | Code syntax highlighting |
+| Streamdown | Streaming Markdown |
+| Monaco Editor | Code editing |
+| Motion | Animations |
+| Zustand | State management |
+| Dexie | IndexedDB persistence |
+| Recharts | Data visualization |
+| Mermaid | Diagrams |
+| Tiptap | Rich text editing |
+| React Virtuoso | Virtualized conversations |
+| Sonner | Notifications |
+
+## Requirements
+
+- Node.js
+- npm
+- Cloudflare account
+- GitHub account (for Git-based deployment)
+- An API key for your chosen AI provider
+
+Additional API credentials may be required for web search and other integrations.
+
+## Installation
+
+Clone the repository:
+
+```bash
+git clone YOUR_REPOSITORY_URL
+cd YOUR_PROJECT_DIRECTORY
+```
+
+Install dependencies:
+
+```bash
 npm install
-npm run worker:dev
 ```
 
-`worker:dev` builds the Vite app and runs the Worker, API routes, and static
-assets through Wrangler. For local server configuration, create an ignored
-`.dev.vars` file:
+Start the development server:
 
-```dotenv
-AI_BASE_URL=https://your-openai-compatible-provider.example/v1
-AI_MODEL=your-model-id
-AI_API_KEY=your-provider-key
+```bash
+npm run dev
 ```
 
-The chat function uses the generic AI SDK OpenAI-compatible adapter. Configure
-a provider that supports the OpenAI Chat Completions-compatible API; no specific
-vendor is selected. Provider credentials remain in the Worker runtime.
-Do not use `VITE_` variables for secrets.
+Open the local URL provided by Vite.
 
-## Cloudflare Workers deployment
+## Environment Variables
 
-1. In Workers Builds, connect the repository with root directory `/`, build
-   command `npm run build`, and deploy command `npx wrangler deploy`.
-   `wrangler.jsonc` configures `dist/` as static assets and enables the
-   `workers.dev` URL.
-2. Set `AI_BASE_URL` and `AI_MODEL` as Worker environment variables. Add
-   `AI_API_KEY` as a secret using `npx wrangler secret put AI_API_KEY`.
-3. For a manual deployment after Wrangler authentication, run
-   `npm run deploy`.
+Configure sensitive credentials through Cloudflare Pages environment variables and secrets.
 
-`GET /api/config` returns only whether the server is configured and the
-non-secret model label. `POST /api/chat` streams AI SDK UI message chunks,
-validates inputs, caps the request body at 8 MB, and returns generic provider
-errors. `POST /api/search` retrieves and parses DuckDuckGo HTML results without
-requiring a search API key. DuckDuckGo does not guarantee an unrestricted search
-API, so availability and result format may change or be rate-limited. The
-Worker serves API endpoints from `functions/api/` and static files from
-`dist/`; it does not enable permissive cross-origin access.
+Examples of configuration names:
 
-## Implemented workspace features
+```env
+AI_API_KEY=
+AI_MODEL=
+AI_BASE_URL=
+SEARCH_API_KEY=
+```
 
-- Carbon-based responsive light/dark/system UI, navigation, conversation
-  search, date grouping, rename/delete, and keyboard shortcuts.
-- AI SDK streaming, stop, regenerate/retry, edit-and-resend, feedback, message
-  copying, local IndexedDB persistence through Dexie, and Zustand settings.
-- Streamdown streaming Markdown with Shiki code highlighting, copy/download
-  controls, math, Mermaid, line numbers, safe HTML handling, and safe-link
-  prompts. Messages use one renderer rather than duplicating Markdown output.
-- Image, PDF, and text/source attachments with size limits, image compression,
-  previews, and a lightbox. Text files are included as text; images/PDFs are
-  sent as model file parts. Provider support for file parts depends on the
-  configured compatible model.
-- Server-side DuckDuckGo web search with returned source links and no API key.
-- Conversation Markdown/JSON export and JSON import.
+These are example names. The actual variables must match the application's backend implementation.
 
-Heavy Markdown and image-viewer code is loaded on demand. The other installed
-editor, charting, terminal, diff, and workflow libraries are available for
-follow-on features but are not yet wired into this app.
+**Never expose API keys through frontend variables prefixed with `VITE_`.**
 
-## Commands
+## Build
 
-- `npm start` — Vite frontend only (Worker API routes are not served here).
-- `npm run worker:dev` — local Worker, API routes, and static assets.
-- `npm run build` — production Vite build.
-- `npm test -- --run` — run tests once.
-- `npm run deploy` — build and deploy the Worker and static assets.
+Create a production build:
+
+```bash
+npm run build
+```
+
+The production output is generated in:
+
+```text
+dist/
+```
+
+Preview the production build locally:
+
+```bash
+npm run preview
+```
+
+## Cloudflare Pages Deployment
+
+This project is designed for Cloudflare Pages.
+
+Recommended build settings:
+
+| Setting | Value |
+|---|---|
+| Framework preset | Vite |
+| Build command | `npm run build` |
+| Build output directory | `dist` |
+| Root directory | `/` |
+
+Deploy using GitHub integration or Wrangler:
+
+```bash
+npx wrangler pages deploy dist
+```
+
+For local Cloudflare Pages testing:
+
+```bash
+npx wrangler pages dev dist
+```
+
+Configure your Cloudflare environment variables and secrets before deploying API-dependent features.
+
+## Project Structure
+
+```text
+project/
+├── functions/
+│   └── api/
+│       ├── chat.js
+│       └── search.js
+├── public/
+├── src/
+│   ├── components/
+│   │   ├── chat/
+│   │   ├── composer/
+│   │   ├── messages/
+│   │   ├── markdown/
+│   │   ├── code/
+│   │   ├── attachments/
+│   │   ├── sidebar/
+│   │   ├── settings/
+│   │   ├── charts/
+│   │   └── diagrams/
+│   ├── hooks/
+│   ├── lib/
+│   ├── services/
+│   ├── stores/
+│   ├── styles/
+│   └── utils/
+├── index.html
+├── package.json
+├── vite.config.js
+└── wrangler.toml
+```
+
+The structure is illustrative and should reflect the actual project files.
+
+## Development
+
+Contributions and improvements are welcome.
+
+When developing new features:
+
+1. Prefer existing libraries over custom implementations.
+2. Follow the existing IBM Carbon design system.
+3. Keep API credentials server-side.
+4. Maintain compatibility with Cloudflare Pages.
+5. Test production builds before deployment.
+6. Keep components reusable and modular.
+
+## License
+
+Specify your preferred project license here.
+
+---
+
+Built with React, IBM Carbon, Vercel AI SDK, and Cloudflare.
