@@ -32,8 +32,31 @@ See the section about [running tests](https://facebook.github.io/create-react-ap
 Builds the app for production to the `build` folder.\
 It correctly bundles React in production mode and optimizes the build for the best performance.
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+The build is minified and the filenames include the hashes in `dist/`.
+The app is configured for Cloudflare Pages in `wrangler.jsonc`.
+
+## Cloudflare Pages
+
+- `npm run pages:dev` builds the Vite app and runs it with Wrangler Pages locally.
+- `npm run pages:deploy` builds and deploys `dist/` to the Pages project named
+  `codespaces-react`. Create the Pages project in Cloudflare first if it does not
+  exist.
+- Add server-side endpoints in the root `functions/` directory. Put local
+  function secrets in `.dev.vars` (ignored by Git); use `wrangler pages secret
+  put <NAME>` for production secrets. Never put model keys in `VITE_` variables.
+
+A model provider has not been selected, so no provider SDK or chat API endpoint
+is configured yet. When selected, integrate it in a Pages Function using the AI
+SDK and Cloudflare runtime bindings.
+
+## Chat dependencies
+
+IBM Carbon is the primary UI system; use Radix primitives only for interactions
+without a suitable Carbon component. Streamdown is the streaming chat Markdown
+renderer, with its code, math, and Mermaid plugins. The React Markdown/remark/
+rehype packages are available for separate non-streaming surfaces; do not
+render the same message through both stacks. Dexie is the primary IndexedDB
+store; avoid persisting the same conversation data separately with `idb`.
 
 See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
 
