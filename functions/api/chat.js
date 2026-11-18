@@ -53,8 +53,13 @@ async function readBoundedJson(request) {
 }
 
 export async function onRequestPost({ request, env }) {
-  if (!env.AI_BASE_URL || !env.AI_MODEL || !env.AI_API_KEY) {
-    return json({ error: 'AI provider is not configured. Set AI_BASE_URL, AI_MODEL, and AI_API_KEY in Cloudflare.' }, 503);
+  const missing = [
+    !env.AI_BASE_URL && 'AI_BASE_URL',
+    !env.AI_MODEL && 'AI_MODEL',
+    !env.AI_API_KEY && 'AI_API_KEY',
+  ].filter(Boolean);
+  if (missing.length) {
+    return json({ error: `Worker configuration is missing: ${missing.join(', ')}.` }, 503);
   }
 
   let payload;

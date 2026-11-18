@@ -222,6 +222,14 @@ export default function App() {
     return list;
   }, [setConversations]);
 
+  const refreshConfig = useCallback(async () => {
+    const response = await fetch('/api/config', { cache: 'no-store' });
+    if (!response.ok) throw new Error('Could not check the Worker configuration');
+    const remoteConfig = await response.json();
+    setConfig(remoteConfig);
+    return remoteConfig;
+  }, [setConfig]);
+
   const createConversation = useCallback(async () => {
     const conversation = {
       id: nanoid(),
@@ -241,7 +249,7 @@ export default function App() {
     if (!initializationRef.current) {
       initializationRef.current = Promise.all([
         refreshConversations(),
-        fetch('/api/config').then((response) => response.ok ? response.json() : null).catch(() => null),
+        refreshConfig().catch(() => null),
       ]);
     }
     initializationRef.current.then(async ([list, remoteConfig]) => {
@@ -260,7 +268,7 @@ export default function App() {
       }
     });
     return () => { active = false; };
-  }, [refreshConversations, createConversation, setConfig, setActiveId]);
+  }, [refreshConversations, refreshConfig, createConversation, setConfig, setActiveId]);
 
   useEffect(() => {
     const resolved = settings.theme === 'system'
@@ -447,7 +455,6 @@ export default function App() {
               <span className="export-label">Export</span>
             </Button>
           )}
-          <Button kind="ghost" size="sm" hasIconOnly renderIcon={Settings2} iconDescription="Settings" onClick={() => setSettingsOpen(true)} />
         </header>
         {loaded && activeConversation ? (
           <ChatPanel
@@ -455,6 +462,7 @@ export default function App() {
             conversation={activeConversation}
             settings={settings}
             config={config}
+            onRefreshConfig={refreshConfig}
             onSave={saveCurrent}
             composerRef={composerRef}
           />

@@ -21,6 +21,7 @@ describe('API route handlers', () => {
     const response = await getConfig({ env: { AI_BASE_URL: 'https://provider.test/v1', AI_MODEL: 'public-model', AI_API_KEY: 'secret' } });
     expect(await response.json()).toEqual({
       configured: true,
+      missing: [],
       model: 'public-model',
       searchAvailable: true,
     });
@@ -35,6 +36,7 @@ describe('API route handlers', () => {
 
       expect(await response.json()).toEqual({
         configured: true,
+        missing: [],
         model: 'public-model',
         searchAvailable: true,
       });
@@ -64,7 +66,17 @@ describe('API route handlers', () => {
   it('reports missing provider configuration without attempting a model call', async () => {
     const response = await postChat({ request: postRequest('/api/chat', { messages: [] }), env: {} });
     expect(response.status).toBe(503);
-    expect(await response.json()).toMatchObject({ error: expect.stringContaining('AI provider is not configured') });
+    expect(await response.json()).toMatchObject({ error: 'Worker configuration is missing: AI_BASE_URL, AI_MODEL, AI_API_KEY.' });
+  });
+
+  it('reports the exact missing Worker variables without exposing values', async () => {
+    const response = await getConfig({ env: { AI_MODEL: 'public-model' } });
+    expect(await response.json()).toEqual({
+      configured: false,
+      missing: ['AI_BASE_URL', 'AI_API_KEY'],
+      model: 'public-model',
+      searchAvailable: true,
+    });
   });
 
   it('rejects malformed chat input before contacting the provider', async () => {

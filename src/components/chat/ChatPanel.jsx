@@ -1,25 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
-import { ArrowDown, Sparkles } from 'lucide-react';
+import { ArrowDown, RefreshCw, Sparkles } from 'lucide-react';
 import { Button, InlineNotification } from '@carbon/react';
 import { toast } from 'sonner';
 import { saveConversation } from '../../lib/database';
 import MessageList from './MessageList';
 import Composer from '../composer/Composer';
 
-const starters = [
-  { title: 'Explain a concept', prompt: 'Explain a complex idea in simple terms.' },
-  { title: 'Write something', prompt: 'Help me draft a clear, thoughtful message about…' },
-  { title: 'Explore an idea', prompt: 'Help me think through an idea I have.' },
-  { title: 'Debug some code', prompt: 'Help me understand and fix this code:\n\n' },
-];
-
 function getMessageText(message) {
   return (message.parts || []).filter((part) => part.type === 'text').map((part) => part.text).join('\n');
 }
 
-export default function ChatPanel({ conversation, settings, config, onSave, composerRef: externalComposerRef }) {
+export default function ChatPanel({ conversation, settings, config, onRefreshConfig, onSave, composerRef: externalComposerRef }) {
   const [draft, setDraft] = useState('');
   const [showLatest, setShowLatest] = useState(false);
   const virtuosoRef = useRef(null);
@@ -108,15 +101,32 @@ export default function ChatPanel({ conversation, settings, config, onSave, comp
     setShowLatest(false);
   };
 
+  const checkProviderConfig = async () => {
+    try {
+      const currentConfig = await onRefreshConfig();
+      if (currentConfig.configured) {
+        toast.success('AI provider is connected');
+      } else {
+        toast.error(`Worker is still missing: ${(currentConfig.missing || []).join(', ') || 'provider settings'}`);
+      }
+    } catch (requestError) {
+      toast.error(requestError.message || 'Could not check the Worker configuration');
+    }
+  };
+
   return (
     <main className="chat-main">
       {!config.configured && (
         <div className="provider-notice" role="status">
           <Sparkles size={16} />
           <span>
-            Add <code>AI_BASE_URL</code>, <code>AI_MODEL</code>, and <code>AI_API_KEY</code> as Cloudflare secrets to enable real responses.
-            No demo responses are generated.
+            Worker configuration is missing: {config.missing?.length
+              ? config.missing.map((name) => <code key={name}>{name}</code>)
+              : 'provider settings'}. Set <code>AI_BASE_URL</code> and <code>AI_MODEL</code> as variables and <code>AI_API_KEY</code> as a secret for this Worker.
           </span>
+          <Button kind="ghost" size="sm" renderIcon={RefreshCw} onClick={checkProviderConfig}>
+            Check again
+          </Button>
         </div>
       )}
       {error && (
@@ -138,25 +148,7 @@ export default function ChatPanel({ conversation, settings, config, onSave, comp
       )}
       {messages.length === 0 ? (
         <div className="welcome-content">
-          <div className="welcome-mark"><Sparkles size={22} /></div>
-          <p className="eyebrow">YOUR THINKING PARTNER</p>
-          <h1>What can I help<br />you with today?</h1>
-          <p className="welcome-description">Ask a question, explore an idea, or bring a problem to solve.</p>
-          <div className="starter-grid">
-            {starters.map((starter) => (
-              <button
-                type="button"
-                key={starter.title}
-                onClick={() => {
-                  if (config.configured) submit(starter.prompt);
-                  else toast.error('Configure the AI provider to start a conversation');
-                }}
-              >
-                <span>{starter.title}</span>
-                <span className="starter-prompt">{starter.prompt.split('\n')[0]}</span>
-              </button>
-            ))}
-          </div>
+          <h1>Hello. What would you like to work on?</h1>
         </div>
       ) : (
         <>
