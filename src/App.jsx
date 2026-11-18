@@ -97,12 +97,12 @@ function SettingsDialog({ open, onClose, settings, updateSettings, config, onExp
         <section className="settings-section">
           <div className="settings-heading">
             <div className="settings-icon"><Sparkles size={17} /></div>
-            <div><h3>Model & generation</h3><p>{config.configured ? `Connected to ${config.model || 'configured model'}.` : 'Set server-side provider configuration to activate chat.'}</p></div>
+            <div><h3>Model & generation</h3><p>{config.configured ? `Connected to ${config.model || 'Workers AI'}.` : 'Deploy the Worker with its Workers AI binding to activate chat.'}</p></div>
           </div>
           <TextInput
             id="model-name"
             labelText="Model override (optional)"
-            helperText="Leave blank to use the model configured in Cloudflare."
+            helperText="Leave blank to use the model configured for this Worker."
             value={settings.model}
             onChange={(event) => updateSettings({ model: event.target.value })}
             placeholder={config.model || 'Provider default'}

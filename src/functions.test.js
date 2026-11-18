@@ -18,7 +18,7 @@ afterEach(() => {
 
 describe('API route handlers', () => {
   it('returns only public provider status', async () => {
-    const response = await getConfig({ env: { AI_BASE_URL: 'https://provider.test/v1', AI_MODEL: 'public-model', AI_API_KEY: 'secret' } });
+    const response = await getConfig({ env: { AI: {}, AI_MODEL: 'public-model' } });
     expect(await response.json()).toEqual({
       configured: true,
       missing: [],
@@ -31,7 +31,7 @@ describe('API route handlers', () => {
     it('dispatches API requests to the existing route handlers', async () => {
       const response = await worker.fetch(
         new Request('https://chat.test/api/config'),
-        { AI_BASE_URL: 'https://provider.test/v1', AI_MODEL: 'public-model', AI_API_KEY: 'secret' },
+        { AI: {}, AI_MODEL: 'public-model' },
       );
 
       expect(await response.json()).toEqual({
@@ -66,14 +66,14 @@ describe('API route handlers', () => {
   it('reports missing provider configuration without attempting a model call', async () => {
     const response = await postChat({ request: postRequest('/api/chat', { messages: [] }), env: {} });
     expect(response.status).toBe(503);
-    expect(await response.json()).toMatchObject({ error: 'Worker configuration is missing: AI_BASE_URL, AI_MODEL, AI_API_KEY.' });
+    expect(await response.json()).toMatchObject({ error: 'Workers AI binding is missing. Add the AI binding to the deployed Worker.' });
   });
 
-  it('reports the exact missing Worker variables without exposing values', async () => {
-    const response = await getConfig({ env: { AI_MODEL: 'public-model' } });
+  it('reports the missing AI binding without exposing secret values', async () => {
+    const response = await getConfig({ env: { AI_MODEL: 'public-model', AI_API_KEY: 'must-not-be-returned' } });
     expect(await response.json()).toEqual({
       configured: false,
-      missing: ['AI_BASE_URL', 'AI_API_KEY'],
+      missing: ['Workers AI binding (AI)'],
       model: 'public-model',
       searchAvailable: true,
     });
@@ -82,7 +82,7 @@ describe('API route handlers', () => {
   it('rejects malformed chat input before contacting the provider', async () => {
     const response = await postChat({
       request: postRequest('/api/chat', { messages: [] }),
-      env: { AI_BASE_URL: 'https://provider.test/v1', AI_MODEL: 'test', AI_API_KEY: 'dummy' },
+      env: { AI: { run: vi.fn() }, AI_MODEL: 'test' },
     });
     expect(response.status).toBe(400);
   });
@@ -95,9 +95,38 @@ describe('API route handlers', () => {
     });
     const response = await postChat({
       request,
-      env: { AI_BASE_URL: 'https://provider.test/v1', AI_MODEL: 'test', AI_API_KEY: 'dummy' },
+      env: { AI: { run: vi.fn() }, AI_MODEL: 'test' },
     });
     expect(response.status).toBe(413);
+  });
+
+  it('streams Workers AI output in the AI SDK UI message protocol', async () => {
+    const aiStream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('data: {"response":"Hello from "}\n\n'));
+        controller.enqueue(new TextEncoder().encode('data: {"response":"Workers AI"}\n\n'));
+        controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
+        controller.close();
+      },
+    });
+    const run = vi.fn(async () => aiStream);
+    const response = await postChat({
+      request: postRequest('/api/chat', {
+        messages: [{ id: 'user-1', role: 'user', parts: [{ type: 'text', text: 'Say hello' }] }],
+      }),
+      env: { AI: { run }, AI_MODEL: '@cf/google/gemma-4-26b-a4b-it' },
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('x-vercel-ai-ui-message-stream')).toBe('v1');
+    const streamText = await response.text();
+    expect(streamText).toContain('"delta":"Hello from "');
+    expect(streamText).toContain('"delta":"Workers AI"');
+    expect(run).toHaveBeenCalledWith(
+      '@cf/google/gemma-4-26b-a4b-it',
+      expect.objectContaining({ stream: true, messages: expect.arrayContaining([expect.objectContaining({ role: 'user', content: 'Say hello' })]) }),
+      expect.objectContaining({ signal: expect.anything() }),
+    );
   });
 
   it('returns parsed DuckDuckGo results without requiring credentials', async () => {

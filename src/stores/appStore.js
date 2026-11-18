@@ -30,7 +30,7 @@ export const useAppStore = create((set) => ({
   activeId: null,
   query: '',
   sidebarOpen: true,
-  config: { configured: false, searchAvailable: true },
+  config: { configured: false, missing: ['Workers AI binding (AI)'], searchAvailable: true },
   setConversations: (conversations) => set({ conversations }),
   setActiveId: (activeId) => set({ activeId }),
   setQuery: (query) => set({ query }),

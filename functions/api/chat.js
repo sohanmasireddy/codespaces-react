@@ -1,8 +1,8 @@
-import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
-import { convertToModelMessages, stepCountIs, streamText, tool } from 'ai';
+import { createUIMessageStream, createUIMessageStreamResponse } from 'ai';
 import { z } from 'zod';
 import { searchDuckDuckGo } from '../lib/duckduckgo.js';
 
+const DEFAULT_MODEL = '@cf/google/gemma-4-26b-a4b-it';
 const requestSchema = z.object({
   messages: z.array(z.object({
     id: z.string().max(200).optional(),
@@ -52,14 +52,57 @@ async function readBoundedJson(request) {
   return JSON.parse(new TextDecoder().decode(bytes));
 }
 
+function messageText(message) {
+  return message.parts
+    .filter((part) => part && typeof part === 'object' && part.type === 'text' && typeof part.text === 'string')
+    .map((part) => part.text.slice(0, MAX_TEXT_CHARS))
+    .join('\n');
+}
+
+function parseStreamEvent(line, writer, textId) {
+  if (!line.startsWith('data:')) return false;
+  const data = line.slice(5).trim();
+  if (!data || data === '[DONE]') return data === '[DONE]';
+
+  const event = JSON.parse(data);
+  if (typeof event.response === 'string' && event.response) {
+    writer.write({ type: 'text-delta', id: textId, delta: event.response });
+  }
+  if (event.error) throw new Error('Workers AI returned an error.');
+  return false;
+}
+
+async function pumpModelStream(stream, writer, textId, signal) {
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  try {
+    while (true) {
+      if (signal.aborted) {
+        await reader.cancel();
+        return;
+      }
+      const { done, value } = await reader.read();
+      buffer += decoder.decode(value, { stream: !done });
+      const lines = buffer.split(/\r?\n/);
+      buffer = lines.pop() || '';
+      for (const line of lines) {
+        if (parseStreamEvent(line, writer, textId)) {
+          await reader.cancel();
+          return;
+        }
+      }
+      if (done) break;
+    }
+    if (buffer) parseStreamEvent(buffer, writer, textId);
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 export async function onRequestPost({ request, env }) {
-  const missing = [
-    !env.AI_BASE_URL && 'AI_BASE_URL',
-    !env.AI_MODEL && 'AI_MODEL',
-    !env.AI_API_KEY && 'AI_API_KEY',
-  ].filter(Boolean);
-  if (missing.length) {
-    return json({ error: `Worker configuration is missing: ${missing.join(', ')}.` }, 503);
+  if (!env.AI) {
+    return json({ error: 'Workers AI binding is missing. Add the AI binding to the deployed Worker.' }, 503);
   }
 
   let payload;
@@ -72,53 +115,56 @@ export async function onRequestPost({ request, env }) {
   const parsed = requestSchema.safeParse(payload);
   if (!parsed.success) return json({ error: 'Invalid chat request. Check the message format and generation settings.' }, 400);
 
-  const normalizedMessages = parsed.data.messages.map((message) => ({
-    ...message,
-    parts: message.parts.map((part) => {
-      if (part && typeof part === 'object' && part.type === 'text' && typeof part.text === 'string') {
-        return { ...part, text: part.text.slice(0, MAX_TEXT_CHARS) };
-      }
-      return part;
-    }),
-  }));
-  const provider = createOpenAICompatible({
-    name: 'configured',
-    baseURL: env.AI_BASE_URL,
-    apiKey: env.AI_API_KEY,
-    supportsStructuredOutputs: true,
-  });
-  const webSearchEnabled = parsed.data.webSearch === true;
-  const tools = webSearchEnabled
-    ? {
-        web_search: tool({
-          description: 'Search the web for current information. Use this for recent facts or when the user explicitly asks for web research. Return source URLs with the findings.',
-          inputSchema: z.object({ query: z.string().min(2).max(400) }),
-          execute: async ({ query }, { abortSignal }) => searchDuckDuckGo(query, abortSignal),
-        }),
-      }
-    : undefined;
+  const userMessages = parsed.data.messages.filter((message) => message.role !== 'system');
+  const latestUserMessage = [...userMessages].reverse().find((message) => message.role === 'user');
+  const searchEnabled = parsed.data.webSearch === true;
+  const textId = crypto.randomUUID();
 
-  try {
-    const result = streamText({
-      model: provider(parsed.data.model || env.AI_MODEL),
-      messages: await convertToModelMessages(normalizedMessages),
-      instructions: [
+  const stream = createUIMessageStream({
+    originalMessages: parsed.data.messages,
+    execute: async ({ writer }) => {
+      writer.write({ type: 'start' });
+      writer.write({ type: 'text-start', id: textId });
+
+      const modelMessages = parsed.data.messages
+        .filter((message) => message.role !== 'system')
+        .map((message) => ({ role: message.role, content: messageText(message) }))
+        .filter((message) => message.content);
+      const instructions = [
         parsed.data.systemPrompt || 'You are a helpful, accurate assistant. If you are unsure, say so.',
-        webSearchEnabled
-          ? 'When web_search is used, cite sources with Markdown links using the URLs returned by the tool. Never invent citations.'
-          : '',
-      ].filter(Boolean).join('\n\n'),
-      temperature: parsed.data.temperature ?? 0.7,
-      maxOutputTokens: parsed.data.maxOutputTokens ?? 2048,
-      tools,
-      stopWhen: tools ? stepCountIs(4) : undefined,
-      abortSignal: request.signal,
-    });
-    return result.toUIMessageStreamResponse({
-      headers: { 'cache-control': 'no-cache, no-transform' },
-      onError: () => 'The configured AI provider could not complete this request.',
-    });
-  } catch {
-    return json({ error: 'The configured AI provider could not start this request.' }, 502);
-  }
+      ];
+
+      if (searchEnabled && latestUserMessage) {
+        const searchQuery = messageText(latestUserMessage).slice(0, 400);
+        if (searchQuery.length >= 2) {
+          const searchResult = await searchDuckDuckGo(searchQuery, request.signal);
+          const toolCallId = crypto.randomUUID();
+          writer.write({ type: 'tool-input-start', toolCallId, toolName: 'web_search' });
+          writer.write({ type: 'tool-input-available', toolCallId, toolName: 'web_search', input: { query: searchQuery } });
+          writer.write({ type: 'tool-output-available', toolCallId, output: searchResult });
+          instructions.push(
+            'Use these DuckDuckGo web search results for current information. Cite sources using the supplied result URLs; never invent citations.',
+            JSON.stringify(searchResult.results),
+          );
+        }
+      }
+
+      modelMessages.unshift({ role: 'system', content: instructions.join('\n\n') });
+      const modelStream = await env.AI.run(parsed.data.model || env.AI_MODEL || DEFAULT_MODEL, {
+        messages: modelMessages,
+        stream: true,
+        temperature: parsed.data.temperature ?? 0.7,
+        max_tokens: parsed.data.maxOutputTokens ?? 2048,
+      }, { signal: request.signal });
+
+      await pumpModelStream(modelStream, writer, textId, request.signal);
+      writer.write({ type: 'text-end', id: textId });
+    },
+    onError: () => 'Workers AI could not complete this request.',
+  });
+
+  return createUIMessageStreamResponse({
+    stream,
+    headers: { 'cache-control': 'no-cache, no-transform' },
+  });
 }

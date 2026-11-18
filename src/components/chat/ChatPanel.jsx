@@ -120,9 +120,8 @@ export default function ChatPanel({ conversation, settings, config, onRefreshCon
         <div className="provider-notice" role="status">
           <Sparkles size={16} />
           <span>
-            Worker configuration is missing: {config.missing?.length
-              ? config.missing.map((name) => <code key={name}>{name}</code>)
-              : 'provider settings'}. Set <code>AI_BASE_URL</code> and <code>AI_MODEL</code> as variables and <code>AI_API_KEY</code> as a secret for this Worker.
+            Workers AI is not available on this deployment. Missing: {config.missing?.join(', ') || 'AI binding'}.
+            The binding is configured in <code>wrangler.jsonc</code>; redeploy this Worker after adding it.
           </span>
           <Button kind="ghost" size="sm" renderIcon={RefreshCw} onClick={checkProviderConfig}>
             Check again

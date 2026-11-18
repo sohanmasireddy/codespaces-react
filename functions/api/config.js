@@ -5,17 +5,13 @@ function json(body, status = 200) {
   });
 }
 
-export async function onRequestGet({ env }) {
-  const missing = [
-    !env.AI_BASE_URL && 'AI_BASE_URL',
-    !env.AI_MODEL && 'AI_MODEL',
-    !env.AI_API_KEY && 'AI_API_KEY',
-  ].filter(Boolean);
+export const DEFAULT_MODEL = '@cf/google/gemma-4-26b-a4b-it';
 
+export async function onRequestGet({ env }) {
   return json({
-    configured: missing.length === 0,
-    missing,
-    model: env.AI_MODEL || null,
+    configured: Boolean(env.AI),
+    missing: env.AI ? [] : ['Workers AI binding (AI)'],
+    model: env.AI_MODEL || DEFAULT_MODEL,
     searchAvailable: true,
   });
 }

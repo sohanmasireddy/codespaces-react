@@ -1,6 +1,14 @@
 # AI Chatbot
 
+<<<<<<< HEAD
 A modern, full-featured AI chatbot built with React, Vite, IBM Carbon, and the Vercel AI SDK. Designed for fast streaming responses, rich Markdown rendering, interactive code blocks, file attachments, and deployment on Cloudflare Pages.
+=======
+A React 18 + Vite chat workspace with IBM Carbon, the Vercel AI SDK, browser-local
+conversation storage, and a Cloudflare Worker. It uses a native Workers AI
+binding, so it does not need a provider API token. The app does not return
+mock responses. Sending is disabled until the Worker is deployed with its
+Workers AI binding.
+>>>>>>> 3163039 (s)
 
 ## Features
 
@@ -106,15 +114,37 @@ npm install
 
 Start the development server:
 
+<<<<<<< HEAD
 ```bash
 npm run dev
 ```
 
 Open the local URL provided by Vite.
+=======
+```dotenv
+AI_MODEL=@cf/google/gemma-4-26b-a4b-it
+```
+
+The Workers AI `AI` binding is configured in `wrangler.jsonc`; it requires no
+API key or account ID. `AI_MODEL` is an optional Worker variable and defaults
+to `@cf/google/gemma-4-26b-a4b-it`. Do not put AI credentials in frontend
+variables.
+>>>>>>> 3163039 (s)
 
 ## Environment Variables
 
+<<<<<<< HEAD
 Configure sensitive credentials through Cloudflare Pages environment variables and secrets.
+=======
+1. In Workers Builds, connect the repository with root directory `/`, build
+   command `npm run build`, and deploy command `npx wrangler deploy`.
+   `wrangler.jsonc` configures `dist/` as static assets and enables the
+   `workers.dev` URL.
+2. The `AI` binding is configured in `wrangler.jsonc`; no Workers AI API token
+   or account ID is needed. Optionally set `AI_MODEL` as a Worker variable.
+3. For a manual deployment after Wrangler authentication, run
+   `npm run deploy`.
+>>>>>>> 3163039 (s)
 
 Examples of configuration names:
 
