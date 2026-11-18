@@ -1,6 +1,7 @@
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { convertToModelMessages, stepCountIs, streamText, tool } from 'ai';
 import { z } from 'zod';
+import { searchDuckDuckGo } from '../lib/duckduckgo.js';
 
 const requestSchema = z.object({
   messages: z.array(z.object({
@@ -51,36 +52,6 @@ async function readBoundedJson(request) {
   return JSON.parse(new TextDecoder().decode(bytes));
 }
 
-async function runSearch(query, env, signal) {
-  if (env.SEARCH_PROVIDER !== 'tavily' || !env.SEARCH_API_KEY) {
-    return { available: false, message: 'Web search is unavailable because no supported search provider is configured.' };
-  }
-  const response = await fetch(env.SEARCH_API_URL || 'https://api.tavily.com/search', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', accept: 'application/json' },
-    body: JSON.stringify({
-      api_key: env.SEARCH_API_KEY,
-      query,
-      max_results: 5,
-      include_images: true,
-      include_answer: false,
-    }),
-    signal,
-  });
-  if (!response.ok) throw new Error('Search provider request failed');
-  const payload = await response.json();
-  return {
-    results: (payload.results || []).slice(0, 5).map((item) => ({
-      title: String(item.title || '').slice(0, 300),
-      url: String(item.url || ''),
-      content: String(item.content || '').slice(0, 1200),
-    })),
-    images: (payload.images || []).slice(0, 4).map((item) =>
-      typeof item === 'string' ? { url: item } : { url: String(item.url || ''), description: String(item.description || '').slice(0, 200) },
-    ),
-  };
-}
-
 export async function onRequestPost({ request, env }) {
   if (!env.AI_BASE_URL || !env.AI_MODEL || !env.AI_API_KEY) {
     return json({ error: 'AI provider is not configured. Set AI_BASE_URL, AI_MODEL, and AI_API_KEY in Cloudflare.' }, 503);
@@ -111,13 +82,13 @@ export async function onRequestPost({ request, env }) {
     apiKey: env.AI_API_KEY,
     supportsStructuredOutputs: true,
   });
-  const webSearchAvailable = parsed.data.webSearch && env.SEARCH_PROVIDER === 'tavily' && Boolean(env.SEARCH_API_KEY);
-  const tools = webSearchAvailable
+  const webSearchEnabled = parsed.data.webSearch === true;
+  const tools = webSearchEnabled
     ? {
         web_search: tool({
           description: 'Search the web for current information. Use this for recent facts or when the user explicitly asks for web research. Return source URLs with the findings.',
           inputSchema: z.object({ query: z.string().min(2).max(400) }),
-          execute: async ({ query }, { abortSignal }) => runSearch(query, env, abortSignal),
+          execute: async ({ query }, { abortSignal }) => searchDuckDuckGo(query, abortSignal),
         }),
       }
     : undefined;
@@ -128,10 +99,7 @@ export async function onRequestPost({ request, env }) {
       messages: await convertToModelMessages(normalizedMessages),
       instructions: [
         parsed.data.systemPrompt || 'You are a helpful, accurate assistant. If you are unsure, say so.',
-        parsed.data.webSearch && !webSearchAvailable
-          ? 'Web search was requested but is unavailable. Be transparent and do not invent current information or citations.'
-          : '',
-        webSearchAvailable
+        webSearchEnabled
           ? 'When web_search is used, cite sources with Markdown links using the URLs returned by the tool. Never invent citations.'
           : '',
       ].filter(Boolean).join('\n\n'),

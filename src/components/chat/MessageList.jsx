@@ -77,7 +77,7 @@ function MessageRow({ message, index, messages, status, onRegenerate, onEdit, on
           ))}
         {searchResults.length > 0 && (
           <section className="search-sources" aria-label="Web search sources">
-            <div className="search-sources-heading"><span className="source-indicator" /> Web search · {searchResults.length} sources</div>
+            <div className="search-sources-heading"><span className="source-indicator" /> DuckDuckGo search · {searchResults.length} sources</div>
             <div className="search-source-list">
               {searchResults.map((result, sourceIndex) => {
                 let safeUrl = '';

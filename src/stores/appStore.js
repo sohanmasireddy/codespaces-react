@@ -30,7 +30,7 @@ export const useAppStore = create((set) => ({
   activeId: null,
   query: '',
   sidebarOpen: true,
-  config: { configured: false, searchAvailable: false },
+  config: { configured: false, searchAvailable: true },
   setConversations: (conversations) => set({ conversations }),
   setActiveId: (activeId) => set({ activeId }),
   setQuery: (query) => set({ query }),

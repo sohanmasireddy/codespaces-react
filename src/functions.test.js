@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { onRequestGet as getConfig } from '../functions/api/config';
 import { onRequestPost as postChat } from '../functions/api/chat';
 import { onRequestPost as postSearch } from '../functions/api/search';
@@ -12,13 +12,17 @@ function postRequest(path, body) {
   });
 }
 
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
 describe('API route handlers', () => {
   it('returns only public provider status', async () => {
     const response = await getConfig({ env: { AI_BASE_URL: 'https://provider.test/v1', AI_MODEL: 'public-model', AI_API_KEY: 'secret' } });
     expect(await response.json()).toEqual({
       configured: true,
       model: 'public-model',
-      searchAvailable: false,
+      searchAvailable: true,
     });
   });
 
@@ -32,7 +36,7 @@ describe('API route handlers', () => {
       expect(await response.json()).toEqual({
         configured: true,
         model: 'public-model',
-        searchAvailable: false,
+        searchAvailable: true,
       });
     });
 
@@ -84,9 +88,22 @@ describe('API route handlers', () => {
     expect(response.status).toBe(413);
   });
 
-  it('reports unavailable search without inventing results', async () => {
-    const response = await postSearch({ request: postRequest('/api/search', { query: 'example' }), env: {} });
-    expect(response.status).toBe(503);
-    expect(await response.json()).toMatchObject({ error: expect.stringContaining('Web search is unavailable') });
+  it('returns parsed DuckDuckGo results without requiring credentials', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(`
+      <a class="result__a" href="https://example.com/article">A &amp; B</a>
+      <a class="result__snippet">Useful &lt;summary&gt; text</a>
+      <a class="result__a" href="javascript:alert(1)">Unsafe result</a>
+    `)));
+    const response = await postSearch({ request: postRequest('/api/search', { query: 'example query' }), env: {} });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      results: [{ title: 'A & B', url: 'https://example.com/article', content: 'Useful <summary> text' }],
+      images: [],
+    });
+    expect(fetch).toHaveBeenCalledWith(
+      expect.objectContaining({ href: expect.stringContaining('q=example+query') }),
+      expect.objectContaining({ signal: expect.anything() }),
+    );
   });
 });

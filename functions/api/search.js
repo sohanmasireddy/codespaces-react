@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { searchDuckDuckGo } from '../lib/duckduckgo.js';
 
 const requestSchema = z.object({
   query: z.string().trim().min(2).max(400),
@@ -10,34 +11,6 @@ function json(body, status = 200) {
     status,
     headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
   });
-}
-
-async function searchTavily(query, env, signal) {
-  const endpoint = env.SEARCH_API_URL || 'https://api.tavily.com/search';
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', accept: 'application/json' },
-    body: JSON.stringify({
-      api_key: env.SEARCH_API_KEY,
-      query,
-      max_results: 5,
-      include_images: true,
-      include_answer: false,
-    }),
-    signal,
-  });
-  if (!response.ok) throw new Error('Search provider request failed');
-  const payload = await response.json();
-  return {
-    results: (payload.results || []).slice(0, 5).map((item) => ({
-      title: String(item.title || '').slice(0, 300),
-      url: String(item.url || ''),
-      content: String(item.content || '').slice(0, 1200),
-    })),
-    images: (payload.images || []).slice(0, 4).map((item) =>
-      typeof item === 'string' ? { url: item } : { url: String(item.url || ''), description: String(item.description || '').slice(0, 200) },
-    ),
-  };
 }
 
 async function readBoundedJson(request) {
@@ -66,10 +39,7 @@ async function readBoundedJson(request) {
   return JSON.parse(new TextDecoder().decode(bytes));
 }
 
-export async function onRequestPost({ request, env }) {
-  if (!env.SEARCH_API_KEY || env.SEARCH_PROVIDER !== 'tavily') {
-    return json({ error: 'Web search is unavailable. Configure SEARCH_PROVIDER=tavily and SEARCH_API_KEY.' }, 503);
-  }
+export async function onRequestPost({ request }) {
   let payload;
   try {
     payload = await readBoundedJson(request);
@@ -80,9 +50,9 @@ export async function onRequestPost({ request, env }) {
   if (!parsed.success) return json({ error: 'Enter a search query between 2 and 400 characters.' }, 400);
 
   try {
-    const result = await searchTavily(parsed.data.query, env, request.signal);
+    const result = await searchDuckDuckGo(parsed.data.query, request.signal);
     return json(result);
   } catch {
-    return json({ error: 'The configured search provider could not complete the request.' }, 502);
+    return json({ error: 'DuckDuckGo could not complete the search request.' }, 502);
   }
 }

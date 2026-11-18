@@ -140,7 +140,7 @@ function SettingsDialog({ open, onClose, settings, updateSettings, config, onExp
         </section>
 
         <section className="settings-section settings-row">
-          <div><h3>Web search</h3><p>{config.searchAvailable ? 'Allow the assistant to search the web when useful.' : 'Unavailable until the Tavily provider is configured in Cloudflare.'}</p></div>
+          <div><h3>Web search</h3><p>{config.searchAvailable ? 'Search the web with DuckDuckGo. No API key is required.' : 'Web search is unavailable.'}</p></div>
           <Toggle
             id="web-search-toggle"
             labelText=""
